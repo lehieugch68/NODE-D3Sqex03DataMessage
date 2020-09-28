@@ -2,6 +2,12 @@
 
 Library for exporting and re-importing text from Drakengard 3 archives (Unreal 3).
 
+## Install
+
+```
+npm i drakengard3-sqex03datamessage
+```
+
 ## Usage:
 
 - Use [Unreal Package Decompressor](https://www.gildor.org/downloads) on .xxx archives (ALLMESSAGE_SF.XXX and MISSIONMESSAGE_SF.XXX);
