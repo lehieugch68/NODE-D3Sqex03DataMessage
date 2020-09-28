@@ -9,7 +9,7 @@ Library for exporting and re-importing text from Drakengard 3 archives (Unreal 3
 - Use this library to export and re-import text.
 
 ```js
-const D3Sqex03DataMessage = require("D3Sqex03DataMessage")
+const D3Sqex03DataMessage = require("d3-sqex03datamessage")
 
 //Export
 D3Sqex03DataMessage.Export(source, destination).catch(er => console.log(err))
