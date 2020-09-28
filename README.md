@@ -2,7 +2,7 @@
 
 Library for exporting and re-importing text from Drakengard 3 archives (Unreal 3).
 
-##Usage:
+## Usage:
 
 - Use [Unreal Package Decompressor](https://www.gildor.org/downloads) on .xxx archives (ALLMESSAGE_SF.XXX and MISSIONMESSAGE_SF.XXX);
 - Copy the uncompressed files and PS3TOC.TXT (in the game folder) to the same folder.
