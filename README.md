@@ -1,4 +1,4 @@
-# Node BDO LanguageData
+# Node Drakengard 3 Sqex03DataMessage
 
 Library for exporting and re-importing text from Drakengard 3 archives (Unreal 3).
 
