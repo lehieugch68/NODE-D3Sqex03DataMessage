@@ -202,8 +202,8 @@ const Sqex03DataMessage = {
                 let buf = Buffer.concat(new_buffer);
                 fs.writeFileSync(new_file, buf);
 
-                const toc_file = path.join(path.dirname(new_file), "PS3TOC.TXT");
-                const new_toc_file = toc_file;
+                let toc_file = path.join(path.dirname(new_file), "PS3TOC.TXT");
+                let new_toc_file = toc_file;
                 if (!fs.existsSync(toc_file)) toc_file = path.join(path.dirname(source_file), "PS3TOC.TXT");
                 if (fs.existsSync(toc_file)) {
                     let all_lines = fs.readFileSync(toc_file, 'utf8').replace(/\r/g, "").split("\n");

@@ -35,4 +35,7 @@ const D3Sqex03DataMessage = {
     }
 }
 
-module.exports = D3Sqex03DataMessage;
+//D3Sqex03DataMessage.Export("./Source", "./Export").catch(err => console.log(err))
+D3Sqex03DataMessage.Import("./Source", "./Export", "./Import").catch(err => console.log(err))
+
+//module.exports = D3Sqex03DataMessage;
