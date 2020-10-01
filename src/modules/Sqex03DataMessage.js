@@ -75,13 +75,13 @@ const Sqex03DataMessage = {
                             let str_length = real_data.slice(p, p+=4).readInt32BE();
                             let zero_bytes = 1;
                             if (str_length < 0) {
-                                str_length *= -2;
+                                str_length = str_length ^0xFFFFFFFF;
                                 zero_bytes = 2;
                             }
-                            let str = zero_bytes < 2 ? real_data.slice(p, p+=(str_length - 1)).toString('utf8') : real_data.slice(p, p+=(str_length - 1)).toString('utf16le');
+                            let str = zero_bytes < 2 ? real_data.slice(p, p+=(str_length - zero_bytes)).toString('utf8') : real_data.slice(p, p+=(str_length)).toString('utf16le');
                             str = str.replace(/\u0005/g, "{5}").replace(/\u0001/g, "{1}").replace(/\u0004/g, "{4}").replace(/\r\n/g, "{CRLF}").replace(/\r/g, "{CR}").replace(/\n/g, "{LF}");
                             data.strings.push(str);
-                            p += 1;
+                            p += zero_bytes;
                         }
                         data_info.data.push(data);
                     }

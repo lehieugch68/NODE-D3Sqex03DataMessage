@@ -3,7 +3,7 @@ const archive_info = [
         Name: ["ALLMESSAGE_SF.XXX", "MISSIONMESSAGE_SF.XXX"],
         Offset: 25,
         Table_to_Data: 456,
-        Skip: [7, 54]
+        Skip: [7,43,54]
     }
 ]
 
