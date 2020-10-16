@@ -10,8 +10,7 @@ npm i drakengard3-sqex03datamessage
 
 ## Usage:
 
-- Use [Unreal Package Decompressor](https://www.gildor.org/downloads) on .xxx archives (ALLMESSAGE_SF.XXX and MISSIONMESSAGE_SF.XXX);
-- Copy the uncompressed files and PS3TOC.TXT (in the game folder) to the same folder.
+- Copy the .XXX archives (ALLMESSAGE_SF.XXX and MISSIONMESSAGE_SF.XXX) and PS3TOC.TXT in the game folder to the same folder.
 - Use this library to export and re-import text.
 
 ```js
