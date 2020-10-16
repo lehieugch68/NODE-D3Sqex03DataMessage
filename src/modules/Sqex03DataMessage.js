@@ -1,5 +1,6 @@
 const fs = require('fs')
 const path = require('path')
+const zlib = require('zlib')
 const file_to_buffer = require('./FileToBuffer')
 const Archives = require('./ArchiveInfo')
 const utf16le_bom = "\ufeff";
@@ -9,7 +10,73 @@ const trim_Start = (str, char) => {
 	return str;
 }
 
+const zlib_decompress = (buffer, skip) => {
+	return new Promise(async (resolve, reject) => {
+		zlib.inflateRaw(buffer.slice(skip), (err, result) => {
+			if (err) return reject(err);
+			resolve(result);
+		})
+	})
+}
+
+const chunk_decompress = (buffer, size) => {
+	return new Promise(async (resolve, reject) => {
+		let decompressed_data = [];
+		let i = 8; //header
+		try {
+			let compressed_size = buffer.slice(i, i+=4).readUInt32BE();
+			let offset = size - compressed_size;
+			let decompressed_size = buffer.slice(i, i+=4).readUInt32BE();
+			let chunk_offset = offset;
+			while (i < offset) {
+				let compressed_chunk_size = buffer.slice(i, i+=4).readUInt32BE();
+				let decompressed_chunk_size = buffer.slice(i, i+=4).readUInt32BE();
+				let compressed_chunk_data = buffer.subarray(chunk_offset, chunk_offset+=compressed_chunk_size);
+				let decompressed_chunk_data = await zlib_decompress(compressed_chunk_data, 2);
+				decompressed_data.push(decompressed_chunk_data);
+			}
+			return resolve(Buffer.concat(decompressed_data));
+		} catch (err) {
+			return reject(err);
+		}
+	})
+}
+
 const Sqex03DataMessage = {
+	Decompress (buffer, archive_info) {
+		let i = archive_info.ChunkCountOffset;
+		return new Promise(async (resolve, reject) => {
+			try {
+				let chunk_count = buffer.slice(i, i+=4).readUInt32BE();
+				let chunk_info = [];
+				for (let x = 0; x < chunk_count; x++) {
+					let chunk = {};
+					chunk.uncompressed_offset = buffer.slice(i, i+=4).readUInt32BE();
+					chunk.uncompressed_size = buffer.slice(i, i+=4).readUInt32BE();
+					chunk.compressed_offset = buffer.slice(i, i+=4).readUInt32BE();
+					chunk.compressed_size = buffer.slice(i, i+=4).readUInt32BE();
+					chunk.compressed_data = buffer.subarray(chunk.compressed_offset, chunk.compressed_offset+chunk.compressed_size);
+					chunk.decompressed_data = await chunk_decompress(chunk.compressed_data, chunk.compressed_size);
+					chunk_info.push(chunk);
+				}
+				let new_buffer = [];
+				new_buffer.push(buffer.subarray(0, 109)); //header
+				new_buffer.push(Buffer.alloc(8)); //compression type and chunk count
+				new_buffer.push(buffer.subarray(i, i+=8)); //unknow
+				let p = archive_info.TableOffset;
+				for (let chunk of chunk_info) {
+					if (chunk.uncompressed_offset > p) {
+						new_buffer.push(Buffer.alloc(chunk.uncompressed_offset-p));
+						p = chunk.uncompressed_offset;
+					}
+					new_buffer.push(chunk.decompressed_data);
+					p += chunk.uncompressed_size;
+				}
+				return resolve(Buffer.concat(new_buffer));
+			} catch (err) { return reject(err) }
+		})
+	},
+
     Export (file, extract_dir) {
         let archive_info = Archives.find(e => e.Name.includes(path.basename(file)));
         let data_info = {
@@ -19,9 +86,20 @@ const Sqex03DataMessage = {
         };
         return new Promise(async (resolve, reject) => {
             try {
-                let i = 0;
+                let i = archive_info.CompressionTypeOffset;
                 let buffer = await file_to_buffer(file);
-                data_info.name_count = buffer.slice(i += archive_info.Offset, i += 4).readUInt32BE();
+                let compression_type = buffer.slice(i, i += 4).readUInt32BE();
+                switch (compression_type) {
+                	case 0:
+                		break;
+                	case 1:
+                		buffer = await this.Decompress(buffer, archive_info);
+                		break;
+                	default:
+                		return reject("Compression type is not supported.");
+                }
+                i = archive_info.Offset;
+                data_info.name_count = buffer.slice(i, i += 4).readUInt32BE();
                 data_info.name_offset = buffer.slice(i, i += 4).readUInt32BE();
                 data_info.export_count = buffer.slice(i, i += 4).readUInt32BE();
                 data_info.export_offset = buffer.slice(i, i += 4).readUInt32BE();
@@ -78,8 +156,10 @@ const Sqex03DataMessage = {
                                 str_length = str_length ^0xFFFFFFFF;
                                 zero_bytes = 2;
                             }
-                            let str = zero_bytes < 2 ? real_data.slice(p, p+=(str_length - zero_bytes)).toString('utf8') : real_data.slice(p, p+=(str_length)).toString('utf16le');
-                            str = str.replace(/\u0005/g, "{5}").replace(/\u0001/g, "{1}").replace(/\u0004/g, "{4}").replace(/\r\n/g, "{CRLF}").replace(/\r/g, "{CR}").replace(/\n/g, "{LF}");
+                            let str = zero_bytes < 2 ? real_data.slice(p, p+=(str_length - zero_bytes)).toString('utf8') : real_data.slice(p, p+=(str_length*2)).toString('utf16le');
+                            archive_info.Replace.map(entry => {
+                            	str = str.replace(new RegExp(entry[0], 'g'), entry[1]);
+                            })
                             data.strings.push(str);
                             p += zero_bytes;
                         }
@@ -112,18 +192,29 @@ const Sqex03DataMessage = {
                 for (let data of export_info.data) {
                     const txt_file = path.join(path.join(dir, "MESSAGE"), `[${data.order}] ${data.name}.txt`);
                     data.strings = trim_Start(fs.readFileSync(txt_file, 'ucs2'), utf16le_bom).replace(/\r/g, "").split("\n").map(e => {
-                        return e.replace(/\{5\}/g, "\u0005").replace(/\{1\}/g, "\u0001").replace(/\{4\}/g, "\u0004").replace(/\{CRLF\}/g, "\r\n").replace(/\{CR\}/g, "\r").replace(/\{LF\}/g, "\n");
+                    	archive_info.Replace.map(entry => {
+                    		let char = `\\{${(/\{(.+?)\}/.exec(entry[1]))[1]}\\}`;
+                            e = e.replace(new RegExp(char, 'g'), entry[0]);
+                        })
+                        return e;
                     });
-                    if (data.strings.length !== data.lines) return reject(`Total number of lines does not match in [${data.order}] ${data.name}.txt`);
                 }
-
-                let i = export_info.export_offset, new_buffer = [];
+                let i = archive_info.CompressionTypeOffset;
                 let buffer = await file_to_buffer(source_file);
-
+                let compression_type = buffer.slice(i, i += 4).readUInt32BE();
+                switch (compression_type) {
+                	case 0:
+                		break;
+                	case 1:
+                		buffer = await this.Decompress(buffer, archive_info);
+                		break;
+                	default:
+                		return reject("Compression type is not supported.");
+                }
+                i = export_info.export_offset, new_buffer = [];
                 new_buffer.push(buffer.subarray(0, export_info.export_offset)); //header
                 let new_data = [];
                 let bytes_changed = 0;
-
                 for (let x = 0; x < export_info.export_count; x++) {
                     let data = {};
                     let bytes_size = i;

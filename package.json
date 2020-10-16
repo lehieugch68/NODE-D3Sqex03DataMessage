@@ -1,6 +1,6 @@
 {
 	"name": "drakengard3-sqex03datamessage",
-	"version": "1.0.1",
+	"version": "1.0.3",
 	"description": "Library for exporting and re-importing text from Drakengard 3 archives (Unreal 3).",
 	"main": "src/index.js",
 	"repository": {
